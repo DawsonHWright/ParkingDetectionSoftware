@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parking Reservation Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Parking Reservation Dashboard</h1>
+      <p class="subtitle">Live detector + reservation system</p>
+    </div>
+    <div class="status-panel">
+      <div><strong>Camera:</strong> <span id="cameraId">--</span></div>
+      <div><strong>Last Update:</strong> <span id="timestamp">--</span></div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="summary-grid">
+      <div class="summary-card">
+        <h2>Total Spots</h2>
+        <p id="totalSpots">0</p>
+      </div>
+      <div class="summary-card free">
+        <h2>Free</h2>
+        <p id="freeSpots">0</p>
+      </div>
+      <div class="summary-card occupied">
+        <h2>Occupied</h2>
+        <p id="occupiedSpots">0</p>
+      </div>
+      <div class="summary-card reserved">
+        <h2>Reserved</h2>
+        <p id="reservedSpots">0</p>
+      </div>
+    </section>
+
+    <section class="controls">
+      <input id="nameInput" type="text" placeholder="Enter your name to reserve" />
+      <button id="refreshBtn">Refresh</button>
+    </section>
+
+    <section>
+      <h2>Parking Spots</h2>
+      <div id="spotsGrid" class="spots-grid"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
