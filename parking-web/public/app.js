@@ -46,7 +46,6 @@ function spotCardHtml(spot) {
     <div class="spot-card ${state}">
       <h3>Spot ${spot.id}</h3>
       <div class="badge ${state}">${label}</div>
-      <p class="spot-meta"><strong>Confidence:</strong> ${confidence}</p>
       <p class="spot-meta"><strong>Reserved By:</strong> ${spot.reservedBy || "None"}</p>
       <p class="spot-meta"><strong>Reserved At:</strong> ${spot.reservedAt ? formatTimestamp(spot.reservedAt) : "N/A"}</p>
       <div class="spot-actions">
