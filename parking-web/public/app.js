@@ -1,5 +1,7 @@
+const API_BASE = "http://35.239.3.208:3000";
+
 async function fetchStatus() {
-  const res = await fetch("/api/status");
+  const res = await fetch(`${API_BASE}/api/status`);
   if (!res.ok) {
     throw new Error("Failed to fetch status");
   }
@@ -89,7 +91,7 @@ async function reserveSpot(id) {
   const name = document.getElementById("nameInput").value.trim();
 
   try {
-    const res = await fetch(`/api/reserve/${id}`, {
+    const res = await fetch(`${API_BASE}/api/reserve/${id}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -112,7 +114,7 @@ async function reserveSpot(id) {
 
 async function releaseSpot(id) {
   try {
-    const res = await fetch(`/api/release/${id}`, {
+    const res = await fetch(`${API_BASE}/api/release/${id}`, {
       method: "POST"
     });
 
