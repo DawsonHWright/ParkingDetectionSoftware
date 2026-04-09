@@ -1,28 +1,30 @@
 {
   "cameraId": "lot-1",
-  "timestamp": "2026-03-04T11:12:31-07:00",
+  "timestamp": "2026-03-04T11:12:30-07:00",
   "spots": [
     {
       "id": "S1",
       "occupied": true,
-      "confidence": 0.889
+      "confidence": 0.872
     },
     {
       "id": "S2",
       "occupied": false,
-      "confidence": 0.756,
-      "reservedBy": "Guest",
-      "reservedAt": "2026-03-12T13:58:52.226Z"
+      "confidence": 0.741,
+      "reservedBy": "Dawson",
+      "reservedAt": "2026-03-12T14:17:38.492Z"
     },
     {
       "id": "S3",
-      "occupied": true,
-      "confidence": 0.612
+      "occupied": false,
+      "confidence": 0.625,
+      "reservedBy": "Guest",
+      "reservedAt": "2026-03-12T14:33:45.324Z"
     },
     {
       "id": "S4",
       "occupied": true,
-      "confidence": 0.821
+      "confidence": 0.803
     }
   ]
 }

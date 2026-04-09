@@ -1,12 +1,15 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const cors = require("cors");
+
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+app.use(cors());
 
 const DATA_DIR = path.join(__dirname, "data");
 const STATUS_FILE = path.join(DATA_DIR, "status.json");
@@ -162,6 +165,6 @@ app.post("/api/release/:id", (req, res) => {
   res.json({ message: `Spot ${spotId} released`, spot });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
 });

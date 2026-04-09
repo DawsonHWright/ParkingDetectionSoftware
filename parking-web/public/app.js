@@ -1,5 +1,7 @@
+const API_BASE = "http://35.239.3.208:3000";
+
 async function fetchStatus() {
-  const res = await fetch("/api/status");
+  const res = await fetch(`${API_BASE}/api/status`);
   if (!res.ok) {
     throw new Error("Failed to fetch status");
   }
@@ -46,7 +48,6 @@ function spotCardHtml(spot) {
     <div class="spot-card ${state}">
       <h3>Spot ${spot.id}</h3>
       <div class="badge ${state}">${label}</div>
-      <p class="spot-meta"><strong>Confidence:</strong> ${confidence}</p>
       <p class="spot-meta"><strong>Reserved By:</strong> ${spot.reservedBy || "None"}</p>
       <p class="spot-meta"><strong>Reserved At:</strong> ${spot.reservedAt ? formatTimestamp(spot.reservedAt) : "N/A"}</p>
       <div class="spot-actions">
@@ -90,7 +91,7 @@ async function reserveSpot(id) {
   const name = document.getElementById("nameInput").value.trim();
 
   try {
-    const res = await fetch(`/api/reserve/${id}`, {
+    const res = await fetch(`${API_BASE}/api/reserve/${id}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -113,7 +114,7 @@ async function reserveSpot(id) {
 
 async function releaseSpot(id) {
   try {
-    const res = await fetch(`/api/release/${id}`, {
+    const res = await fetch(`${API_BASE}/api/release/${id}`, {
       method: "POST"
     });
 
