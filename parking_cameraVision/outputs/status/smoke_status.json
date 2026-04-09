@@ -1,0 +1,36 @@
+{
+  "cameraId": "lot-1",
+  "timestamp": "2026-03-25T11:28:07-06:00",
+  "spots": [
+    {
+      "id": "S1",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S2",
+      "occupied": true,
+      "confidence": 0.667
+    },
+    {
+      "id": "S3",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S4",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S5",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S6",
+      "occupied": false,
+      "confidence": 1.0
+    }
+  ]
+}

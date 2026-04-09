@@ -1,0 +1,216 @@
+{
+  "cameraId": "lot-1",
+  "timestamp": "2026-03-25T14:29:30-06:00",
+  "spots": [
+    {
+      "id": "S1",
+      "occupied": true,
+      "confidence": 1.0
+    },
+    {
+      "id": "S2",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S3",
+      "occupied": true,
+      "confidence": 0.882
+    },
+    {
+      "id": "S4",
+      "occupied": true,
+      "confidence": 0.716
+    },
+    {
+      "id": "S5",
+      "occupied": false,
+      "confidence": 0.891
+    },
+    {
+      "id": "S6",
+      "occupied": false,
+      "confidence": 0.189
+    },
+    {
+      "id": "S7",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S8",
+      "occupied": false,
+      "confidence": 0.374
+    },
+    {
+      "id": "S9",
+      "occupied": false,
+      "confidence": 0.974
+    },
+    {
+      "id": "S10",
+      "occupied": false,
+      "confidence": 0.895
+    },
+    {
+      "id": "S11",
+      "occupied": false,
+      "confidence": 0.676
+    },
+    {
+      "id": "S12",
+      "occupied": false,
+      "confidence": 0.981
+    },
+    {
+      "id": "S13",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S14",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S15",
+      "occupied": true,
+      "confidence": 0.696
+    },
+    {
+      "id": "S16",
+      "occupied": true,
+      "confidence": 0.486
+    },
+    {
+      "id": "S17",
+      "occupied": false,
+      "confidence": 0.083
+    },
+    {
+      "id": "S18",
+      "occupied": true,
+      "confidence": 1.0
+    },
+    {
+      "id": "S19",
+      "occupied": false,
+      "confidence": 0.7
+    },
+    {
+      "id": "S20",
+      "occupied": true,
+      "confidence": 0.63
+    },
+    {
+      "id": "S21",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S22",
+      "occupied": true,
+      "confidence": 1.0
+    },
+    {
+      "id": "S23",
+      "occupied": true,
+      "confidence": 0.231
+    },
+    {
+      "id": "S24",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S25",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S26",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S27",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S28",
+      "occupied": true,
+      "confidence": 1.0
+    },
+    {
+      "id": "S29",
+      "occupied": false,
+      "confidence": 0.093
+    },
+    {
+      "id": "S30",
+      "occupied": true,
+      "confidence": 0.381
+    },
+    {
+      "id": "S31",
+      "occupied": true,
+      "confidence": 0.215
+    },
+    {
+      "id": "S32",
+      "occupied": false,
+      "confidence": 0.674
+    },
+    {
+      "id": "S33",
+      "occupied": true,
+      "confidence": 1.0
+    },
+    {
+      "id": "S34",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S35",
+      "occupied": true,
+      "confidence": 1.0
+    },
+    {
+      "id": "S36",
+      "occupied": true,
+      "confidence": 1.0
+    },
+    {
+      "id": "S37",
+      "occupied": false,
+      "confidence": 0.066
+    },
+    {
+      "id": "S38",
+      "occupied": false,
+      "confidence": 1.0
+    },
+    {
+      "id": "S39",
+      "occupied": false,
+      "confidence": 0.824
+    },
+    {
+      "id": "S40",
+      "occupied": true,
+      "confidence": 1.0
+    },
+    {
+      "id": "S41",
+      "occupied": true,
+      "confidence": 0.088
+    },
+    {
+      "id": "S42",
+      "occupied": false,
+      "confidence": 0.346
+    }
+  ]
+}
