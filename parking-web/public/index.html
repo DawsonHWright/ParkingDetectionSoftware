@@ -10,28 +10,49 @@
   <header class="topbar">
     <div>
       <h1>Parking Reservation Dashboard</h1>
+
+      <!-- ORIGINAL:
       <p class="subtitle">Live detector + reservation system</p>
+      -->
+
+      <!-- CHANGED THIS because the page is no longer just showing a simple list of spots.
+           It is now meant to act more like a visual parking map tied to the backend. -->
+      <p class="subtitle">Live parking map with reservation system</p>
     </div>
+
     <div class="status-panel">
+      <!-- KEPT THIS because users still need to know which lot/camera the data is coming from. -->
       <div><strong>Camera:</strong> <span id="cameraId">--</span></div>
+
+      <!-- KEPT THIS because the timestamp shows how fresh the parking data is. -->
       <div><strong>Last Update:</strong> <span id="timestamp">--</span></div>
+
+      <!-- ADDED THIS FOR showing which spot the user has currently selected.
+           I added this because the new layout lets people click a spot first,
+           then reserve it using the button instead of reserving immediately on click. -->
+      <div><strong>Selected Spot:</strong> <span id="selectedSpotLabel">None</span></div>
     </div>
   </header>
 
   <main class="container">
     <section class="summary-grid">
+      <!-- KEPT THIS summary section because it still gives a simple overview
+           before the user interacts with the map. -->
       <div class="summary-card">
         <h2>Total Spots</h2>
         <p id="totalSpots">0</p>
       </div>
+
       <div class="summary-card free">
         <h2>Free</h2>
         <p id="freeSpots">0</p>
       </div>
+
       <div class="summary-card occupied">
         <h2>Occupied</h2>
         <p id="occupiedSpots">0</p>
       </div>
+
       <div class="summary-card reserved">
         <h2>Reserved</h2>
         <p id="reservedSpots">0</p>
@@ -39,13 +60,52 @@
     </section>
 
     <section class="controls">
+      <!-- KEPT THIS because the user still needs to enter a name before reserving. -->
       <input id="nameInput" type="text" placeholder="Enter your name to reserve" />
-      <button id="refreshBtn">Refresh</button>
+
+      <!-- ADDED THIS FOR confirming a reservation after selecting a parking space.
+           The old version reserved directly from each card.
+           The new version is more like a theater layout where a spot gets selected first. -->
+      <button id="reserveBtn" type="button">Reserve Selected Spot</button>
+
+      <!-- ADDED THIS FOR letting users unselect a spot if they change their mind. -->
+      <button id="clearSelectionBtn" type="button">Clear Selection</button>
+
+      <!-- KEPT THIS because manual refresh is still useful even with auto-refresh. -->
+      <button id="refreshBtn" type="button">Refresh</button>
     </section>
 
+    <!-- ORIGINAL:
     <section>
       <h2>Parking Spots</h2>
       <div id="spotsGrid" class="spots-grid"></div>
+    </section>
+    -->
+
+    <!-- CHANGED THIS because the old version rendered parking spaces as cards in a grid.
+         I replaced that with a visual lot map so it feels more like a movie-theater layout,
+         but for parking spaces. -->
+    <section class="lot-section">
+      <div class="lot-header-row">
+        <h2>Lot Map</h2>
+
+        <!-- ADDED THIS legend so the user can immediately understand the color meaning
+             without having to read extra instructions. -->
+        <div class="lot-legend">
+          <span class="legend-item"><span class="legend-swatch free"></span> Open</span>
+          <span class="legend-item"><span class="legend-swatch selected"></span> Selected</span>
+          <span class="legend-item"><span class="legend-swatch occupied"></span> Unavailable</span>
+        </div>
+      </div>
+
+      <!-- ADDED THIS because the lot is now drawn as a positioned visual map instead of cards.
+           JavaScript will place the parking spaces here using the layout data from the backend. -->
+      <div id="lotCanvas" class="lot-canvas"></div>
+
+      <!-- ADDED THIS helper text so users know how interaction works in the new layout. -->
+      <p class="lot-help">
+        CMU green means open. Yellow means selected. Red means unavailable.
+      </p>
     </section>
   </main>
 

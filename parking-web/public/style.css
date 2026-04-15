@@ -35,11 +35,12 @@ body {
   padding: 1rem;
   border-radius: 12px;
   min-width: 260px;
+  line-height: 1.7;
 }
 
 .container {
   padding: 2rem;
-  max-width: 1200px;
+  max-width: 1300px;
   margin: 0 auto;
 }
 
@@ -70,15 +71,15 @@ body {
 }
 
 .summary-card.free {
-  border-left: 6px solid #16a34a;
+  border-left: 6px solid #3a7d44;
 }
 
 .summary-card.occupied {
-  border-left: 6px solid #dc2626;
+  border-left: 6px solid #b91c1c;
 }
 
 .summary-card.reserved {
-  border-left: 6px solid #2563eb;
+  border-left: 6px solid #d4a017;
 }
 
 .controls {
@@ -109,91 +110,162 @@ body {
   background: #1e293b;
 }
 
-.spots-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 1rem;
-}
+/* REMOVED THE OLD CARD GRID LOOK.
+   The old version used .spots-grid and .spot-card for a list of parking cards.
+   The new version uses a visual lot map instead. */
 
-.spot-card {
+.lot-section {
   background: white;
-  border-radius: 14px;
-  padding: 1rem;
+  border-radius: 18px;
+  padding: 1rem 1.25rem 1.25rem 1.25rem;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
-  border-top: 8px solid #94a3b8;
 }
 
-.spot-card.free {
-  border-top-color: #16a34a;
+.lot-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
-.spot-card.occupied {
-  border-top-color: #dc2626;
+.lot-header-row h2 {
+  margin: 0;
 }
 
-.spot-card.reserved {
-  border-top-color: #2563eb;
+.lot-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
-.spot-card h3 {
-  margin-top: 0;
-  margin-bottom: 0.75rem;
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+  color: #475569;
 }
 
-.spot-meta {
-  margin: 0.35rem 0;
-  color: #334155;
-}
-
-.badge {
+.legend-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
   display: inline-block;
-  padding: 0.35rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: bold;
-  margin-bottom: 0.75rem;
 }
 
-.badge.free {
-  background: #dcfce7;
-  color: #166534;
+.legend-swatch.free {
+  background: #3a7d44;
 }
 
-.badge.occupied {
-  background: #fee2e2;
-  color: #991b1b;
+.legend-swatch.selected {
+  background: #d4a017;
 }
 
-.badge.reserved {
-  background: #dbeafe;
-  color: #1d4ed8;
+.legend-swatch.reserved,
+.legend-swatch.occupied {
+  background: #b91c1c;
 }
 
-.spot-actions {
+.lot-canvas {
+  position: relative;
   margin-top: 1rem;
+  border: 2px solid #d1d5db;
+  border-radius: 18px;
+  background: #e5e7eb;
+  overflow: auto;
 }
 
-.spot-actions button {
-  width: 100%;
-  padding: 0.75rem;
-  border: none;
+.lot-help {
+  margin: 0.85rem 0 0 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.lot-decoration {
+  position: absolute;
+}
+
+.lot-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.drive-lane,
+.center-aisle {
+  background: #94a3b8;
+  border-radius: 12px;
+  opacity: 0.35;
+}
+
+.entrance-text,
+.exit-text {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.lot-spot {
+  position: absolute;
+  border: 2px solid #1f2937;
   border-radius: 10px;
   cursor: pointer;
-  font-weight: bold;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.1rem;
+  background: white;
+  color: #111827;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+  font-weight: 700;
 }
 
-.reserve-btn {
-  background: #2563eb;
+.lot-spot:hover {
+  opacity: 0.92;
+}
+
+.lot-spot.free {
+  background: #3a7d44;
   color: white;
+  border-color: #2f6137;
 }
 
-.release-btn {
-  background: #475569;
+.lot-spot.selected {
+  background: #d4a017;
+  color: #111827;
+  border-color: #b8860b;
+}
+
+.lot-spot.reserved,
+.lot-spot.occupied {
+  background: #b91c1c;
   color: white;
-}
-
-.reserve-btn:disabled,
-.release-btn:disabled {
-  opacity: 0.5;
+  border-color: #7f1d1d;
   cursor: not-allowed;
+}
+
+.lot-spot.accessible {
+  border-style: dashed;
+}
+
+.spot-label {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.spot-id {
+  font-size: 0.72rem;
+  opacity: 0.92;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    flex-direction: column;
+  }
+
+  .status-panel {
+    width: 100%;
+  }
 }
