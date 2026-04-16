@@ -1,4 +1,4 @@
-const API_BASE = "http://35.239.3.208:3000";
+const API_BASE = "http://34.42.182.205:3000";
 
 // ADDED THIS because the old version only fetched status and rendered cards.
 // The newer version still uses backend status, but it also builds a simple
