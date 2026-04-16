@@ -70,6 +70,9 @@ body {
   font-weight: bold;
 }
 
+/* CHANGED THIS because the summary cards now match the simplified
+   parking map color system:
+   green = open, yellow = selected/reservation-related state, red = unavailable. */
 .summary-card.free {
   border-left: 6px solid #3a7d44;
 }
@@ -110,9 +113,12 @@ body {
   background: #1e293b;
 }
 
-/* REMOVED THE OLD CARD GRID LOOK.
-   The old version used .spots-grid and .spot-card for a list of parking cards.
-   The new version uses a visual lot map instead. */
+/* ORIGINAL:
+   The old version used .spots-grid and .spot-card to render a list of cards.
+
+   CHANGED THIS because the page now uses a visual parking map instead
+   of individual parking cards.
+   The styles below are for the theater-style lot layout. */
 
 .lot-section {
   background: white;
@@ -154,6 +160,8 @@ body {
   display: inline-block;
 }
 
+/* CHANGED THIS because the legend now matches the simple color meaning:
+   green = open, yellow = selected, red = unavailable. - tom chose colors */
 .legend-swatch.free {
   background: #3a7d44;
 }
@@ -167,6 +175,8 @@ body {
   background: #b91c1c;
 }
 
+/* ADDED THIS because the lot is now drawn inside a custom canvas area
+   instead of a normal HTML card grid. */
 .lot-canvas {
   position: relative;
   margin-top: 1rem;
@@ -182,6 +192,8 @@ body {
   font-size: 0.95rem;
 }
 
+/* ADDED THIS because decorations like title, aisle, entrance, and exit
+   are positioned on top of the parking canvas. */
 .lot-decoration {
   position: absolute;
 }
@@ -192,6 +204,8 @@ body {
   color: #111827;
 }
 
+/* ADDED THIS for visual lane / aisle styling so the lot feels like
+   a simple parking map instead of just floating buttons. */
 .drive-lane,
 .center-aisle {
   background: #94a3b8;
@@ -206,6 +220,8 @@ body {
   color: #111827;
 }
 
+/* CHANGED THIS because each parking space is now rendered as a positioned
+   button on the lot map instead of a card in a list. */
 .lot-spot {
   position: absolute;
   border: 2px solid #1f2937;
@@ -226,18 +242,23 @@ body {
   opacity: 0.92;
 }
 
+/* CHANGED THIS because open spots should use green. */
 .lot-spot.free {
   background: #3a7d44;
   color: white;
   border-color: #2f6137;
 }
 
+/* ADDED THIS because clicking an open spot should highlight it
+   before the user confirms the reservation. */
 .lot-spot.selected {
   background: #d4a017;
   color: #111827;
   border-color: #b8860b;
 }
 
+/* CHANGED THIS so both occupied and reserved spaces read as unavailable
+   and use the same red visual treatment. */
 .lot-spot.reserved,
 .lot-spot.occupied {
   background: #b91c1c;
@@ -246,6 +267,8 @@ body {
   cursor: not-allowed;
 }
 
+/* KEPT THIS because accessible spaces can still be visually distinguished
+   later */
 .lot-spot.accessible {
   border-style: dashed;
 }
@@ -260,6 +283,7 @@ body {
   opacity: 0.92;
 }
 
+/* KEPT THIS so the layout still adapts on smaller screens. */
 @media (max-width: 900px) {
   .topbar {
     flex-direction: column;

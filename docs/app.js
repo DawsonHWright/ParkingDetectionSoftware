@@ -1,7 +1,8 @@
 const API_BASE = "http://35.239.3.208:3000";
 
 // ADDED THIS because the old version only fetched status and rendered cards.
-// The theater-style layout needs both the visual layout and the live spot status.
+// The newer version still uses backend status, but it also builds a simple
+// theater-style layout automatically from the returned spot IDs.
 let currentLayout = null;
 let currentStatus = null;
 let selectedSpotId = null;
@@ -23,13 +24,18 @@ async function fetchJson(url, options = {}) {
   return data;
 }
 
-// ADDED THIS FOR loading the parking lot layout blueprint.
-async function fetchLayout() {
-  return fetchJson(`${API_BASE}/api/layout`);
+// ORIGINAL:
+// async function fetchLayout() {
+//   return fetchJson(`${API_BASE}/api/layout`);
+// }
+
+// CHANGED THIS the layout will be auto-generated from the spot IDs in status.
+function fetchLayout() {
+  return null;
 }
 
-// KEPT / CHANGED THIS because status still comes from the backend,
-// but now it is used to color spots on the map instead of making cards.
+// KEPT THIS because live parking status still comes from the backend.
+// This is what tells the page which spaces exist and whether they are open or unavailable.
 async function fetchStatus() {
   return fetchJson(`${API_BASE}/api/status`);
 }
@@ -41,8 +47,10 @@ function formatTimestamp(ts) {
   return d.toLocaleString();
 }
 
-// CHANGED THIS so reserved and occupied can both show as unavailable / red.
-// Free stays green. Selected will be handled separately.
+// CHANGED THIS so the UI stays simple:
+// free = green
+// selected = yellow
+// occupied/reserved = red -- open to changing colors
 function getVisualState(spot) {
   if (spot.occupied) return "occupied";
   if (spot.reservedBy) return "reserved";
@@ -61,6 +69,152 @@ function updateSummary(spots) {
   document.getElementById("freeSpots").textContent = free;
 }
 
+// ADDED THIS FOR keeping spot IDs in numeric order like S1, S2, S10.
+// This matters because plain text sorting would put S10 before S2.
+function sortSpotsById(spots) {
+  return [...spots].sort((a, b) => {
+    const aNum = Number(String(a.id).replace(/\D/g, "")) || 0;
+    const bNum = Number(String(b.id).replace(/\D/g, "")) || 0;
+    return aNum - bNum;
+  });
+}
+
+// ADDED THIS FOR generating row labels like A, B, C.
+// It helps create cleaner display labels on the auto-generated layout.
+function rowLabel(index) {
+  return String.fromCharCode(65 + index);
+}
+
+// ADDED THIS because we do not have a finalized manual lot map yet.
+// This automatically builds a simple theater-style layout from however many
+// spaces the backend returns, so the page does not depend on hard-coded
+// spot positions or a separate layout file. -- something TOM wanted 
+function buildAutoLayout(spots) {
+  const sorted = sortSpotsById(spots);
+  const total = sorted.length;
+
+  const spotWidth = 90;
+  const spotHeight = 55;
+  const horizontalGap = 20;
+  const rowGap = 80;
+  const aisleWidth = 120;
+  const leftMargin = 140;
+  const topMargin = 110;
+  const bottomPadding = 180;
+
+  // CHANGED THIS because we do not want to hard-code 3 spots on each side.
+  // This calculates a reasonable even number of spots per row automatically
+  // based on how many spaces the backend returns.
+  let spotsPerRow = Math.ceil(Math.sqrt(total));
+  if (spotsPerRow < 4) spotsPerRow = 4;
+  if (spotsPerRow > 8) spotsPerRow = 8;
+  if (spotsPerRow % 2 !== 0) spotsPerRow += 1;
+
+  const leftCols = spotsPerRow / 2;
+  const rows = Math.max(1, Math.ceil(total / spotsPerRow));
+
+  const leftBlockWidth = leftCols * spotWidth + (leftCols - 1) * horizontalGap;
+  const rightBlockWidth = leftBlockWidth;
+
+  const canvasWidth =
+    leftMargin +
+    leftBlockWidth +
+    aisleWidth +
+    rightBlockWidth +
+    leftMargin;
+
+  const canvasHeight = topMargin + rows * rowGap + bottomPadding;
+
+  function getSpotPosition(index) {
+    const row = Math.floor(index / spotsPerRow);
+    const col = index % spotsPerRow;
+
+    let x;
+
+    if (col < leftCols) {
+      x = leftMargin + col * (spotWidth + horizontalGap);
+    } else {
+      const rightCol = col - leftCols;
+      x =
+        leftMargin +
+        leftBlockWidth +
+        aisleWidth +
+        rightCol * (spotWidth + horizontalGap);
+    }
+
+    const y = topMargin + row * rowGap;
+    return { x, y, row, col };
+  }
+
+  const layoutSpots = sorted.map((spot, index) => {
+    const pos = getSpotPosition(index);
+
+    return {
+      id: String(spot.id),
+      label: `${rowLabel(pos.row)}${pos.col + 1}`,
+      x: pos.x,
+      y: pos.y,
+      width: spotWidth,
+      height: spotHeight,
+      angle: 0,
+      type: "standard"
+    };
+  });
+
+  const aisleX = leftMargin + leftBlockWidth + (aisleWidth / 2) - 15;
+
+  // ADDED THIS FOR creating the visual layout object the page expects.
+  // This gives us a center aisle, entrance, exit, title, and all spot positions.
+  return {
+    cameraId: "lot-1",
+    name: "Auto Parking Layout",
+    canvas: {
+      width: canvasWidth,
+      height: canvasHeight
+    },
+    decorations: [
+      {
+        kind: "text",
+        text: "PARKING LOT MAP",
+        x: Math.max(40, Math.floor(canvasWidth / 2) - 150),
+        y: 35,
+        className: "lot-title"
+      },
+      {
+        kind: "lane",
+        x: 90,
+        y: canvasHeight - 140,
+        width: canvasWidth - 180,
+        height: 70,
+        className: "drive-lane"
+      },
+      {
+        kind: "text",
+        text: "ENTRANCE",
+        x: 110,
+        y: canvasHeight - 45,
+        className: "entrance-text"
+      },
+      {
+        kind: "text",
+        text: "EXIT",
+        x: canvasWidth - 190,
+        y: canvasHeight - 45,
+        className: "exit-text"
+      },
+      {
+        kind: "lane",
+        x: aisleX,
+        y: topMargin - 20,
+        width: 30,
+        height: rows * rowGap + 40,
+        className: "center-aisle"
+      }
+    ],
+    spots: layoutSpots
+  };
+}
+
 function updateSelectedLabel(layout, selectedId) {
   const labelEl = document.getElementById("selectedSpotLabel");
 
@@ -73,7 +227,9 @@ function updateSelectedLabel(layout, selectedId) {
   labelEl.textContent = spot ? `${spot.label} (${spot.id})` : selectedId;
 }
 
-// ADDED THIS FOR drawing entrance / exit / aisle decorations from lotlayout.json.
+// ADDED THIS FOR drawing title, aisle, entrance, and exit decorations.
+// These are part of the auto-generated layout so the page still feels like
+// a parking map instead of a plain list of buttons.
 function createDecorationElement(item) {
   const el = document.createElement("div");
   el.className = `lot-decoration ${item.className || ""}`;
@@ -95,7 +251,8 @@ function createDecorationElement(item) {
 }
 
 // CHANGED THIS because the old version created cards.
-// This now creates positioned parking spaces like theater seats.
+// This version still creates positioned parking spots, but now the positions
+// come from the auto-generated layout instead of a separate layout file.
 function createSpotElement(layoutSpot, statusSpot) {
   const state = getVisualState(statusSpot);
   const isSelected = selectedSpotId === layoutSpot.id && state === "free";
@@ -127,13 +284,14 @@ function createSpotElement(layoutSpot, statusSpot) {
     `Confidence: ${confidence}`
   ].join("\n");
 
-  el.addEventListener("click", async () => {
+  el.addEventListener("click", () => {
     if (state === "occupied" || state === "reserved") {
       alert("That space is unavailable.");
       return;
     }
 
-    // ADDED THIS so clicking a free spot highlights it yellow instead of reserving immediately.
+    // ADDED THIS because you wanted a theater-style flow.
+    // Clicking a free spot selects it first instead of reserving it immediately.
     if (selectedSpotId === layoutSpot.id) {
       selectedSpotId = null;
     } else {
@@ -148,6 +306,8 @@ function createSpotElement(layoutSpot, statusSpot) {
 }
 
 // ADDED THIS FOR drawing the theater-style parking layout.
+// It takes the auto-generated layout and the live status and combines them
+// so each parking spot is placed correctly and colored by its current state.
 function renderLot(layout, status) {
   const canvas = document.getElementById("lotCanvas");
   canvas.innerHTML = "";
@@ -160,10 +320,10 @@ function renderLot(layout, status) {
     }
   }
 
-  const statusMap = new Map(status.spots.map((spot) => [spot.id, spot]));
+  const statusMap = new Map((status.spots || []).map((spot) => [String(spot.id), spot]));
 
   for (const layoutSpot of layout.spots) {
-    const statusSpot = statusMap.get(layoutSpot.id) || {
+    const statusSpot = statusMap.get(String(layoutSpot.id)) || {
       id: layoutSpot.id,
       occupied: false,
       confidence: 0,
@@ -176,17 +336,19 @@ function renderLot(layout, status) {
   }
 }
 
-// CHANGED THIS because the page now has to load both layout + live status.
+// CHANGED THIS because the page no longer loads a layout from the backend.
+// It now builds the layout automatically from the returned spot IDs,
+// then uses the backend status to color and update the spots.
 async function renderDashboard() {
   try {
-    if (!currentLayout) {
-      currentLayout = await fetchLayout();
-    }
-
     currentStatus = await fetchStatus();
 
     const spots = Array.isArray(currentStatus.spots) ? currentStatus.spots : [];
-    const selectedStatus = spots.find((spot) => spot.id === selectedSpotId);
+
+    // ADDED THIS because the layout is now auto-generated from live spots.
+    currentLayout = buildAutoLayout(spots);
+
+    const selectedStatus = spots.find((spot) => String(spot.id) === String(selectedSpotId));
 
     if (selectedStatus && (selectedStatus.occupied || selectedStatus.reservedBy)) {
       selectedSpotId = null;
@@ -235,7 +397,8 @@ async function reserveSelectedSpot() {
   }
 }
 
-// KEPT THIS as a backend call, but now it is not tied to clicking unavailable spots.
+// KEPT THIS as a backend call because releasing a reservation still belongs
+// to the backend even though the layout is now generated on the frontend.
 async function releaseSpot(id) {
   try {
     await fetchJson(`${API_BASE}/api/release/${id}`, {
@@ -261,5 +424,11 @@ document.getElementById("clearSelectionBtn").addEventListener("click", () => {
   renderLot(currentLayout, currentStatus);
 });
 
+// ORIGINAL:
+// renderStatus();
+// setInterval(renderStatus, 3000);
+
+// CHANGED THIS because the page now refreshes the full auto-generated layout
+// and live status together instead of just refreshing the old card list.
 renderDashboard();
 setInterval(renderDashboard, 3000);
