@@ -3,47 +3,105 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Parking Detection Project</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 40px;
-      background: #f5f7fb;
-      color: #1f2937;
-      text-align: center;
-    }
-    .card {
-      max-width: 850px;
-      margin: 60px auto;
-      background: white;
-      padding: 40px;
-      border-radius: 16px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-    }
-    h1 {
-      margin-bottom: 10px;
-    }
-    p {
-      line-height: 1.6;
-    }
-    .tag {
-      display: inline-block;
-      margin-top: 18px;
-      padding: 8px 14px;
-      background: #2563eb;
-      color: white;
-      border-radius: 999px;
-      font-size: 14px;
-    }
-  </style>
+  <title>Parking Reservation Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="card">
-    <h1>Parking Detection Project</h1>
-    <p>This is our GitHub Pages test site for the parking detection system.</p>
-    <p>Frontend demo, layout ideas, and project information can live here for free.</p>
-    <div class="tag">GitHub Pages Demo</div>
-  </div>
+  <header class="topbar">
+    <div>
+      <h1>Parking Reservation Dashboard</h1>
+
+      <!-- ORIGINAL:
+      <p class="subtitle">Live detector + reservation system</p>
+      -->
+
+      <!-- CHANGED THIS because the page now works more like a visual parking map
+           instead of only showing a simple list of parking spots. -->
+      <p class="subtitle">Live parking map with reservation system</p>
+    </div>
+
+    <div class="status-panel">
+      <div><strong>Camera:</strong> <span id="cameraId">--</span></div>
+
+      <div><strong>Last Update:</strong> <span id="timestamp">--</span></div>
+
+      <!-- ADDED THIS because the new layout lets a user select a spot first,
+           then reserve it with the button. -->
+      <div><strong>Selected Spot:</strong> <span id="selectedSpotLabel">None</span></div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="summary-grid">
+      
+      <div class="summary-card">
+        <h2>Total Spots</h2>
+        <p id="totalSpots">0</p>
+      </div>
+
+      <div class="summary-card free">
+        <h2>Free</h2>
+        <p id="freeSpots">0</p>
+      </div>
+
+      <div class="summary-card occupied">
+        <h2>Occupied</h2>
+        <p id="occupiedSpots">0</p>
+      </div>
+
+      <div class="summary-card reserved">
+        <h2>Reserved</h2>
+        <p id="reservedSpots">0</p>
+      </div>
+    </section>
+
+    <section class="controls">
+      
+      <input id="nameInput" type="text" placeholder="Enter your name to reserve" />
+
+      <!-- ADDED THIS because spots are now selected first instead of being reserved immediately. -->
+      <button id="reserveBtn" type="button">Reserve Selected Spot</button>
+
+      <!-- ADDED THIS so a user can clear their current selection. -->
+      <button id="clearSelectionBtn" type="button">Clear Selection</button>
+
+      <!-- manual refresh is still useful even with auto-refresh. -->
+      <button id="refreshBtn" type="button">Refresh</button>
+    </section>
+
+    <!-- ORIGINAL:
+    <section>
+      <h2>Parking Spots</h2>
+      <div id="spotsGrid" class="spots-grid"></div>
+    </section>
+    -->
+
+    <!-- CHANGED THIS because the old version used a card grid.
+         This version uses a visual lot map so the layout feels more like
+         a theater-style parking selector. -->
+    <section class="lot-section">
+      <div class="lot-header-row">
+        <h2>Lot Map</h2>
+
+        <!-- ADDED THIS so users can quickly understand the spot colors. -->
+        <div class="lot-legend">
+          <span class="legend-item"><span class="legend-swatch free"></span> Open</span>
+          <span class="legend-item"><span class="legend-swatch selected"></span> Selected</span>
+          <span class="legend-item"><span class="legend-swatch occupied"></span> Unavailable</span>
+        </div>
+      </div>
+
+      <!-- ADDED THIS because parking spaces are now drawn as positioned spots
+           instead of cards in a grid. -->
+      <div id="lotCanvas" class="lot-canvas"></div>
+
+      <!-- ADDED THIS to briefly explain the color meaning to users. -->
+      <p class="lot-help">
+        CMU green means open. Yellow means selected. Red means unavailable.
+      </p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
 </body>
 </html>
