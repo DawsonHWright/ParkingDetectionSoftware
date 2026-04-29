@@ -4,6 +4,10 @@ detector.py
 
 Use a saved parking mask to detect which spots are occupied or free.
 Supports image, folder, video, webcam index, and URL/stream inputs.
+
+Detection backends:
+  yolo      -- YOLOv8 vehicle detection (default, recommended)
+  heuristic -- Legacy edge-density + frame-diff method
 """
 
 from __future__ import annotations
@@ -26,6 +30,8 @@ except Exception:
     requests = None
 
 Box = Tuple[int, int, int, int]
+
+VEHICLE_CLASSES = {2, 3, 5, 7}  # COCO: car, motorcycle, bus, truck (used with --vehicle-only)
 
 
 def ensure_parent_dir(path: str) -> None:
@@ -75,7 +81,6 @@ def mask_to_spots(mask: np.ndarray) -> List[Box]:
     unique_vals = [int(v) for v in np.unique(mask) if int(v) != 0]
     boxes: List[Box] = []
 
-    # Backward compatibility for old binary masks.
     if len(unique_vals) <= 1:
         binary = ((mask > 127).astype(np.uint8) * 255)
         total_labels, _, stats, _ = cv2.connectedComponentsWithStats(binary, 8, cv2.CV_32S)
@@ -90,7 +95,6 @@ def mask_to_spots(mask: np.ndarray) -> List[Box]:
             boxes.append((x, y, w, h))
         return boxes
 
-    # Labeled masks: each non-zero value is one parking spot, even if touching.
     for label_val in sorted(unique_vals):
         ys, xs = np.where(mask == label_val)
         area = int(xs.size)
@@ -106,6 +110,74 @@ def mask_to_spots(mask: np.ndarray) -> List[Box]:
     return boxes
 
 
+# ---------------------------------------------------------------------------
+# YOLO detection backend
+# ---------------------------------------------------------------------------
+
+def load_yolo_model(model_size: str = "yolov8n"):
+    from ultralytics import YOLO
+    model = YOLO(f"{model_size}.pt")
+    return model
+
+
+def detect_vehicles(model, frame: np.ndarray, conf: float = 0.25, vehicle_only: bool = False) -> List[Box]:
+    """Run YOLO and return bounding boxes for detected objects.
+
+    When vehicle_only=False (default), any detection counts -- this handles
+    overhead/angled cameras where cars get misclassified by shape.
+    Detections larger than 25% of frame area are discarded (false positives like
+    "train" spanning the whole image).
+    """
+    results = model(frame, conf=conf, verbose=False)
+    frame_h, frame_w = frame.shape[:2]
+    max_det_area = frame_w * frame_h * 0.25
+    boxes: List[Box] = []
+    for det in results:
+        for box_data in det.boxes:
+            cls_id = int(box_data.cls[0])
+            if vehicle_only and cls_id not in VEHICLE_CLASSES:
+                continue
+            x1, y1, x2, y2 = box_data.xyxy[0].cpu().numpy()
+            w = int(x2 - x1)
+            h = int(y2 - y1)
+            if w * h > max_det_area:
+                continue
+            boxes.append((int(x1), int(y1), w, h))
+    return boxes
+
+
+def box_iou(a: Box, b: Box) -> float:
+    """Intersection-over-minimum-area between two (x, y, w, h) boxes.
+
+    Uses the minimum area of the two boxes as the denominator so that a small
+    parking spot fully covered by a large vehicle detection scores ~1.0.
+    """
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    ix1 = max(ax, bx)
+    iy1 = max(ay, by)
+    ix2 = min(ax + aw, bx + bw)
+    iy2 = min(ay + ah, by + bh)
+    if ix2 <= ix1 or iy2 <= iy1:
+        return 0.0
+    inter = (ix2 - ix1) * (iy2 - iy1)
+    min_area = min(aw * ah, bw * bh)
+    return inter / max(float(min_area), 1e-6)
+
+
+def yolo_spot_occupancy(spots: List[Box], vehicles: List[Box], iou_thresh: float = 0.15) -> List[bool]:
+    """For each spot, return True if any vehicle overlaps above the threshold."""
+    occupied = []
+    for spot in spots:
+        hit = any(box_iou(spot, v) >= iou_thresh for v in vehicles)
+        occupied.append(hit)
+    return occupied
+
+
+# ---------------------------------------------------------------------------
+# Legacy heuristic detection backend
+# ---------------------------------------------------------------------------
+
 def calc_edge_density(gray_roi: np.ndarray) -> float:
     blur = cv2.GaussianBlur(gray_roi, (5, 5), 0)
     edges = cv2.Canny(blur, 60, 160)
@@ -118,27 +190,35 @@ def calc_mean_diff(roi1: np.ndarray, roi2: Optional[np.ndarray]) -> float:
     return float(abs(np.mean(roi1.astype(np.float32)) - np.mean(roi2.astype(np.float32))))
 
 
+# ---------------------------------------------------------------------------
+# Temporal smoothing (shared by both backends)
+# ---------------------------------------------------------------------------
+
 class SpotStateManager:
-    def __init__(self, history_len: int, on_threshold: float, off_threshold: float):
+    def __init__(self, history_len: int, on_threshold: float = 0.5, off_threshold: float = 0.5):
         self.history_len = history_len
         self.on_threshold = on_threshold
         self.off_threshold = off_threshold
         self.state: Dict[int, bool] = {}
         self.history: Dict[int, deque] = {}
 
-    def update(self, spot_idx: int, score: float) -> Tuple[bool, float]:
-        prev = self.state.get(spot_idx, False)
-        current = score >= (self.off_threshold if prev else self.on_threshold)
+    def update(self, spot_idx: int, occupied_raw: bool) -> bool:
         hist = self.history.setdefault(spot_idx, deque(maxlen=self.history_len))
-        hist.append(current)
+        hist.append(occupied_raw)
         occupied = sum(hist) >= (len(hist) // 2 + 1)
         self.state[spot_idx] = occupied
+        return occupied
 
-        band_center = (self.on_threshold + self.off_threshold) / 2.0
-        spread = max(1e-6, abs(self.on_threshold - self.off_threshold) / 2.0)
-        confidence = min(1.0, abs(score - band_center) / (3.0 * spread))
-        return occupied, float(confidence)
+    def update_score(self, spot_idx: int, score: float) -> bool:
+        """Legacy interface for the heuristic backend."""
+        prev = self.state.get(spot_idx, False)
+        current = score >= (self.off_threshold if prev else self.on_threshold)
+        return self.update(spot_idx, current)
 
+
+# ---------------------------------------------------------------------------
+# Payload
+# ---------------------------------------------------------------------------
 
 def emit_payload(camera_id: str, results: List[Dict], output_path: str, post_url: str = "") -> None:
     payload = {
@@ -162,7 +242,50 @@ def emit_payload(camera_id: str, results: List[Dict], output_path: str, post_url
             print(f"[WARN] POST failed: {exc}")
 
 
-def analyze_frame(frame: np.ndarray, previous_frame: Optional[np.ndarray], spots: List[Box], manager: SpotStateManager) -> Tuple[List[Dict], np.ndarray]:
+# ---------------------------------------------------------------------------
+# Frame analysis
+# ---------------------------------------------------------------------------
+
+def analyze_frame_yolo(
+    frame: np.ndarray,
+    spots: List[Box],
+    manager: SpotStateManager,
+    yolo_model,
+    yolo_conf: float,
+    iou_thresh: float,
+    vehicle_only: bool = False,
+) -> Tuple[List[Dict], np.ndarray]:
+    overlay = frame.copy()
+    vehicles = detect_vehicles(yolo_model, frame, conf=yolo_conf, vehicle_only=vehicle_only)
+    raw_occ = yolo_spot_occupancy(spots, vehicles, iou_thresh=iou_thresh)
+
+    results = []
+    free_count = 0
+    for idx, ((x, y, w, h), raw) in enumerate(zip(spots, raw_occ), start=1):
+        occupied = manager.update(idx, raw)
+        if not occupied:
+            free_count += 1
+        color = (0, 0, 255) if occupied else (0, 255, 0)
+        cv2.rectangle(overlay, (x, y), (x + w, y + h), color, 2)
+        cv2.putText(overlay, f"S{idx}:{'OCC' if occupied else 'FREE'}", (x, max(18, y - 4)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 2)
+        results.append({"id": f"S{idx}", "occupied": bool(occupied)})
+
+    for vx, vy, vw, vh in vehicles:
+        cv2.rectangle(overlay, (vx, vy), (vx + vw, vy + vh), (255, 180, 0), 1)
+
+    cv2.rectangle(overlay, (20, 20), (430, 80), (0, 0, 0), -1)
+    cv2.putText(overlay, f"Available spots: {free_count} / {len(spots)}", (35, 58),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+    return results, overlay
+
+
+def analyze_frame_heuristic(
+    frame: np.ndarray,
+    previous_frame: Optional[np.ndarray],
+    spots: List[Box],
+    manager: SpotStateManager,
+) -> Tuple[List[Dict], np.ndarray]:
     overlay = frame.copy()
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     prev_gray = None if previous_frame is None else cv2.cvtColor(previous_frame, cv2.COLOR_BGR2GRAY)
@@ -175,36 +298,64 @@ def analyze_frame(frame: np.ndarray, previous_frame: Optional[np.ndarray], spots
         edge_density = calc_edge_density(roi)
         mean_diff = calc_mean_diff(roi, prev_roi)
         score = (0.75 * edge_density) + (0.25 * min(mean_diff / 64.0, 1.0))
-        occupied, confidence = manager.update(idx, score)
+        occupied = manager.update_score(idx, score)
         if not occupied:
             free_count += 1
         color = (0, 0, 255) if occupied else (0, 255, 0)
         cv2.rectangle(overlay, (x, y), (x + w, y + h), color, 2)
-        cv2.putText(overlay, f"S{idx}:{'OCC' if occupied else 'FREE'}", (x, max(18, y - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 2)
-        results.append({"id": f"S{idx}", "occupied": bool(occupied), "confidence": round(confidence, 3)})
+        cv2.putText(overlay, f"S{idx}:{'OCC' if occupied else 'FREE'}", (x, max(18, y - 4)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 2)
+        results.append({"id": f"S{idx}", "occupied": bool(occupied)})
 
     cv2.rectangle(overlay, (20, 20), (430, 80), (0, 0, 0), -1)
-    cv2.putText(overlay, f"Available spots: {free_count} / {len(spots)}", (35, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+    cv2.putText(overlay, f"Available spots: {free_count} / {len(spots)}", (35, 58),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
     return results, overlay
 
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Parking detector using a saved mask.")
     parser.add_argument("--source", required=True, help="Image, folder, webcam index, video file, or URL")
     parser.add_argument("--mask", required=True, help="Mask image path")
+    parser.add_argument("--detector", choices=["yolo", "heuristic"], default="yolo",
+                        help="Detection backend (default: yolo)")
+    parser.add_argument("--yolo-model", default="yolov8n", help="YOLO model size (default: yolov8n)")
+    parser.add_argument("--yolo-conf", type=float, default=0.25, help="YOLO confidence threshold")
+    parser.add_argument("--iou-thresh", type=float, default=0.15,
+                        help="Min overlap to count a vehicle as occupying a spot")
+    parser.add_argument("--vehicle-only", action="store_true",
+                        help="Only count YOLO vehicle classes (car/truck/bus/motorcycle). "
+                             "Default: any detection counts, which handles overhead cameras better.")
     parser.add_argument("--width", type=int, default=1280, help="Resize frames to this width")
     parser.add_argument("--camera-id", default="lot-1", help="Identifier included in JSON output")
     parser.add_argument("--out", default="outputs/status/status.json", help="JSON output path")
     parser.add_argument("--post", default="", help="Optional backend URL to POST updates to")
     parser.add_argument("--every", type=float, default=1.0, help="Seconds between emitted updates")
-    parser.add_argument("--history", type=int, default=7, help="Temporal smoothing history length")
-    parser.add_argument("--on-threshold", type=float, default=0.055, help="Threshold to switch FREE -> OCC")
-    parser.add_argument("--off-threshold", type=float, default=0.035, help="Threshold to switch OCC -> FREE")
+    parser.add_argument("--history", type=int, default=5, help="Temporal smoothing history length")
+    parser.add_argument("--on-threshold", type=float, default=0.055,
+                        help="(heuristic only) Threshold FREE -> OCC")
+    parser.add_argument("--off-threshold", type=float, default=0.035,
+                        help="(heuristic only) Threshold OCC -> FREE")
     parser.add_argument("--show", action="store_true", help="Show overlay window")
     args = parser.parse_args()
 
+    use_yolo = args.detector == "yolo"
+    yolo_model = None
+    if use_yolo:
+        print(f"Loading YOLO model: {args.yolo_model} ...")
+        yolo_model = load_yolo_model(args.yolo_model)
+        print("YOLO model loaded.")
+
+    if use_yolo:
+        manager = SpotStateManager(args.history)
+    else:
+        manager = SpotStateManager(args.history, args.on_threshold, args.off_threshold)
+
     kind, src = open_source(args.source)
-    manager = SpotStateManager(args.history, args.on_threshold, args.off_threshold)
     previous_frame = None
     last_emit_time = 0.0
 
@@ -212,10 +363,17 @@ def main() -> None:
         nonlocal previous_frame, last_emit_time
         frame = resize_keep_aspect(frame, args.width)
         if frame.shape[:2] != mask_resized.shape[:2]:
-            mask_resized = cv2.resize(mask_resized, (frame.shape[1], frame.shape[0]), interpolation=cv2.INTER_NEAREST)
+            mask_resized = cv2.resize(mask_resized, (frame.shape[1], frame.shape[0]),
+                                      interpolation=cv2.INTER_NEAREST)
             spots = mask_to_spots(mask_resized)
 
-        results, overlay = analyze_frame(frame, previous_frame, spots, manager)
+        if use_yolo:
+            results, overlay = analyze_frame_yolo(
+                frame, spots, manager, yolo_model, args.yolo_conf, args.iou_thresh,
+                vehicle_only=args.vehicle_only)
+        else:
+            results, overlay = analyze_frame_heuristic(frame, previous_frame, spots, manager)
+
         now = time.time()
         if now - last_emit_time >= args.every:
             emit_payload(args.camera_id, results, args.out, args.post)

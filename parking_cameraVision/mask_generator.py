@@ -5,12 +5,17 @@ mask_generator.py
 Generate and edit a parking-spot mask from a reference image, video, camera index,
 or stream URL.
 
+Modes:
+  auto  -- Auto-generate a mask via edge detection, then open the editor.
+  edit  -- Edit an existing mask interactively.
+
+The editor supports manual drawing, removal, and SAM-assisted click-to-segment.
+
 Examples
 --------
-python3 mask_generator.py auto --source inputs/images/lot.jpg --mask outputs/masks/lot_mask.png
-python3 mask_generator.py edit --source inputs/images/lot.jpg --mask outputs/masks/lot_mask.png
-python3 mask_generator.py auto --source 0 --mask outputs/masks/webcam_mask.png
-python3 mask_generator.py auto --source "http://your-stream-url" --mask outputs/masks/stream_mask.png
+python3 mask_generator.py auto --source inputs/images/lot.jpg --mask lot_mask.png
+python3 mask_generator.py edit --source inputs/images/lot.jpg --mask lot_mask.png
+python3 mask_generator.py auto --source inputs/images/lot.jpg --sam
 """
 
 from __future__ import annotations
@@ -29,7 +34,49 @@ import numpy as np
 
 Point = Tuple[int, int]
 MASK_OUTPUT_DIR = Path("outputs") / "masks"
+DEFAULT_SAM_CHECKPOINT = Path(__file__).resolve().parent / "models" / "sam_vit_b_01ec64.pth"
+SAM_MODEL_TYPE = "vit_b"
 
+
+# ---------------------------------------------------------------------------
+# SAM helpers
+# ---------------------------------------------------------------------------
+
+def load_sam_predictor(checkpoint: str, model_type: str = SAM_MODEL_TYPE):
+    """Load SAM model and return a SamPredictor ready for set_image()."""
+    import torch
+    from segment_anything import sam_model_registry, SamPredictor
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Loading SAM model ({model_type}) on {device} ...")
+    sam = sam_model_registry[model_type](checkpoint=checkpoint)
+    sam.to(device)
+    predictor = SamPredictor(sam)
+    print("SAM model loaded.")
+    return predictor
+
+
+def sam_segment_at_point(predictor, x: int, y: int) -> Optional[np.ndarray]:
+    """Given a SamPredictor with an image already set, segment at (x, y).
+
+    Returns a binary mask (uint8, 0/255) or None if segmentation failed.
+    """
+    point_coords = np.array([[x, y]])
+    point_labels = np.array([1])  # 1 = foreground
+    masks, scores, _ = predictor.predict(
+        point_coords=point_coords,
+        point_labels=point_labels,
+        multimask_output=True,
+    )
+    if masks is None or len(masks) == 0:
+        return None
+    best_idx = int(np.argmax(scores))
+    return (masks[best_idx].astype(np.uint8) * 255)
+
+
+# ---------------------------------------------------------------------------
+# Display / filesystem helpers
+# ---------------------------------------------------------------------------
 
 def display_available() -> bool:
     if platform.system().lower() != "linux":
@@ -144,6 +191,10 @@ def read_frame_from_source(source: str, width: int) -> np.ndarray:
     return resize_keep_aspect(frame, width)
 
 
+# ---------------------------------------------------------------------------
+# Legacy auto-generation (edge-based)
+# ---------------------------------------------------------------------------
+
 def preprocess_for_lines(image: np.ndarray) -> np.ndarray:
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -231,16 +282,30 @@ def mask_to_label_map(mask: np.ndarray) -> np.ndarray:
     return label_map
 
 
+# ---------------------------------------------------------------------------
+# Interactive mask editor
+# ---------------------------------------------------------------------------
+
 class MaskEditor:
-    def __init__(self, image: np.ndarray, mask: np.ndarray):
+    """Interactive editor with manual draw/remove and SAM click-to-segment."""
+
+    def __init__(self, image: np.ndarray, mask: np.ndarray, sam_predictor=None):
         self.image = image
         self.original_mask = mask_to_label_map(mask)
         self.mask = self.original_mask.copy()
         self.display_help = True
-        self.mode = "view"  # one of: view, draw, remove
+        self.mode = "view"  # view, draw, remove, sam
+        self.sam_predictor = sam_predictor
+        self.sam_ready = sam_predictor is not None
         self.drag_start: Optional[Point] = None
         self.drag_current: Optional[Point] = None
         self.window_name = "mask_editor"
+
+        if self.sam_ready:
+            print("Encoding image for SAM (one-time step) ...")
+            rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            self.sam_predictor.set_image(rgb)
+            print("SAM image encoded. Press A to enter SAM mode.")
 
     def _connected_components_boxes(self) -> List[Tuple[int, int, int, int]]:
         boxes = []
@@ -271,6 +336,25 @@ class MaskEditor:
             raise RuntimeError("Too many spots in mask (label limit reached).")
         return current_max + 1
 
+    def _add_sam_segment(self, x: int, y: int) -> None:
+        if not self.sam_ready:
+            print("SAM not loaded. Start with --sam to enable.")
+            return
+        seg_mask = sam_segment_at_point(self.sam_predictor, x, y)
+        if seg_mask is None:
+            print(f"SAM: no segment found at ({x}, {y})")
+            return
+        if seg_mask.shape[:2] != self.mask.shape[:2]:
+            seg_mask = cv2.resize(seg_mask, (self.mask.shape[1], self.mask.shape[0]),
+                                  interpolation=cv2.INTER_NEAREST)
+        area = int(np.count_nonzero(seg_mask))
+        if area < 25:
+            print(f"SAM: segment too small ({area} px)")
+            return
+        label = self._next_label()
+        self.mask[seg_mask > 127] = label
+        print(f"SAM: added spot (label={label}, area={area} px)")
+
     def _draw_overlay(self) -> np.ndarray:
         canvas = self.image.copy()
         mask_color = np.zeros_like(canvas)
@@ -287,16 +371,23 @@ class MaskEditor:
             x2, y2 = self.drag_current
             cv2.rectangle(canvas, (x1, y1), (x2, y2), (0, 255, 255), 2)
 
-        cv2.rectangle(canvas, (10, 10), (210, 40), (0, 0, 0), -1)
-        cv2.putText(canvas, f"Mode: {self.mode.upper()}", (16, 32), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+        mode_label = self.mode.upper()
+        if self.mode == "sam":
+            mode_label = "SAM (click to segment)"
+        cv2.rectangle(canvas, (10, 10), (340, 40), (0, 0, 0), -1)
+        cv2.putText(canvas, f"Mode: {mode_label}", (16, 32),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
 
         if self.display_help:
             lines = [
                 "D: draw mode (left drag to add)",
-                "R: remove mode (left click to delete spot)",
-                "V: view mode (disable editing clicks)",
+                "R: remove mode (left click to delete)",
+                "A: SAM mode (click to auto-segment spot)",
+                "V: view mode",
                 "S: save   X: reset   H: help   Q: quit",
             ]
+            if not self.sam_ready:
+                lines[2] = "A: SAM mode (not loaded, use --sam)"
             y = 24
             for line in lines:
                 cv2.putText(canvas, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
@@ -323,6 +414,9 @@ class MaskEditor:
         elif self.mode == "remove":
             if event == cv2.EVENT_LBUTTONDOWN:
                 self._delete_box_at((x, y))
+        elif self.mode == "sam":
+            if event == cv2.EVENT_LBUTTONDOWN:
+                self._add_sam_segment(x, y)
 
     def run(self, save_path: str) -> None:
         if not display_available():
@@ -353,6 +447,14 @@ class MaskEditor:
             elif key == ord("d"):
                 self.mode = "draw"
                 print("Switched to draw mode.")
+            elif key == ord("a"):
+                if self.sam_ready:
+                    self.mode = "sam"
+                    self.drag_start = None
+                    self.drag_current = None
+                    print("Switched to SAM mode. Click inside a parking spot to auto-segment it.")
+                else:
+                    print("SAM not loaded. Restart with --sam to enable SAM mode.")
             elif key == ord("v"):
                 self.mode = "view"
                 self.drag_start = None
@@ -366,6 +468,10 @@ class MaskEditor:
         cv2.destroyWindow(self.window_name)
 
 
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Auto-generate and/or edit a parking lot mask.")
     subparsers = parser.add_subparsers(dest="mode", required=True)
@@ -375,17 +481,31 @@ def main() -> None:
     auto_parser.add_argument("--mask", default="", help="Output mask name/path (saved under outputs/masks/)")
     auto_parser.add_argument("--width", type=int, default=1280, help="Resize reference frame to this width")
     auto_parser.add_argument("--min-area", type=int, default=250, help="Minimum candidate rectangle area")
-    auto_parser.add_argument("--max-area-ratio", type=float, default=0.05, help="Maximum rectangle area as a fraction of image area")
-    auto_parser.add_argument("--no-edit", action="store_true", help="Do not open the interactive editor after auto-generating the mask")
+    auto_parser.add_argument("--max-area-ratio", type=float, default=0.05,
+                             help="Maximum rectangle area as a fraction of image area")
+    auto_parser.add_argument("--no-edit", action="store_true",
+                             help="Do not open the interactive editor after auto-generating the mask")
+    auto_parser.add_argument("--sam", action="store_true", help="Enable SAM click-to-segment in the editor")
+    auto_parser.add_argument("--sam-checkpoint", default=str(DEFAULT_SAM_CHECKPOINT),
+                             help="Path to SAM model checkpoint")
 
     edit_parser = subparsers.add_parser("edit", help="Edit an existing mask only.")
-    edit_parser.add_argument("--source", required=True, help="Reference image/video/folder/webcam index/stream URL")
-    edit_parser.add_argument("--mask", default="", help="Existing mask name/path (looked up under outputs/masks/)")
+    edit_parser.add_argument("--source", required=True,
+                             help="Reference image/video/folder/webcam index/stream URL")
+    edit_parser.add_argument("--mask", default="",
+                             help="Existing mask name/path (looked up under outputs/masks/)")
     edit_parser.add_argument("--width", type=int, default=1280, help="Resize reference frame to this width")
+    edit_parser.add_argument("--sam", action="store_true", help="Enable SAM click-to-segment in the editor")
+    edit_parser.add_argument("--sam-checkpoint", default=str(DEFAULT_SAM_CHECKPOINT),
+                             help="Path to SAM model checkpoint")
 
     args = parser.parse_args()
     image = read_frame_from_source(args.source, args.width)
     mask_path = resolve_mask_path(args.source, args.mask)
+
+    sam_predictor = None
+    if args.sam:
+        sam_predictor = load_sam_predictor(args.sam_checkpoint)
 
     if args.mode == "auto":
         mask = auto_generate_mask(image, min_area=args.min_area, max_area_ratio=args.max_area_ratio)
@@ -394,7 +514,7 @@ def main() -> None:
         print(f"Initial auto-generated mask saved to: {mask_path}")
         if args.no_edit:
             return
-        MaskEditor(image, mask).run(mask_path)
+        MaskEditor(image, mask, sam_predictor=sam_predictor).run(mask_path)
     else:
         if not os.path.exists(mask_path):
             raise FileNotFoundError(f"Mask file not found: {mask_path}")
@@ -405,7 +525,7 @@ def main() -> None:
             mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         if mask.shape[:2] != image.shape[:2]:
             mask = cv2.resize(mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
-        MaskEditor(image, mask).run(mask_path)
+        MaskEditor(image, mask, sam_predictor=sam_predictor).run(mask_path)
 
 
 if __name__ == "__main__":
