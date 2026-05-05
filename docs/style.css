@@ -1,0 +1,295 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f4f7fb;
+  color: #1f2937;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: #0f172a;
+  color: white;
+  padding: 1.25rem 2rem;
+  flex-wrap: wrap;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.subtitle {
+  margin: 0.35rem 0 0;
+  color: #cbd5e1;
+}
+
+.status-panel {
+  background: #1e293b;
+  padding: 1rem;
+  border-radius: 12px;
+  min-width: 260px;
+  line-height: 1.7;
+}
+
+.container {
+  padding: 2rem;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-card {
+  background: white;
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.summary-card h2 {
+  margin-top: 0;
+  font-size: 1rem;
+  color: #475569;
+}
+
+.summary-card p {
+  font-size: 2rem;
+  margin: 0.5rem 0 0;
+  font-weight: bold;
+}
+
+/* CHANGED THIS because the summary cards now match the simplified
+   parking map color system:
+   green = open, yellow = selected/reservation-related state, red = unavailable. */
+.summary-card.free {
+  border-left: 6px solid #3a7d44;
+}
+
+.summary-card.occupied {
+  border-left: 6px solid #b91c1c;
+}
+
+.summary-card.reserved {
+  border-left: 6px solid #d4a017;
+}
+
+.controls {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.controls input {
+  flex: 1;
+  min-width: 240px;
+  padding: 0.8rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+
+.controls button {
+  padding: 0.8rem 1.1rem;
+  border: none;
+  background: #0f172a;
+  color: white;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.controls button:hover {
+  background: #1e293b;
+}
+
+/* ORIGINAL:
+   The old version used .spots-grid and .spot-card to render a list of cards.
+
+   CHANGED THIS because the page now uses a visual parking map instead
+   of individual parking cards.
+   The styles below are for the theater-style lot layout. */
+
+.lot-section {
+  background: white;
+  border-radius: 18px;
+  padding: 1rem 1.25rem 1.25rem 1.25rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.lot-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.lot-header-row h2 {
+  margin: 0;
+}
+
+.lot-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+  color: #475569;
+}
+
+.legend-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* CHANGED THIS because the legend now matches the simple color meaning:
+   green = open, yellow = selected, red = unavailable. - tom chose colors */
+.legend-swatch.free {
+  background: #3a7d44;
+}
+
+.legend-swatch.selected {
+  background: #d4a017;
+}
+
+.legend-swatch.reserved,
+.legend-swatch.occupied {
+  background: #b91c1c;
+}
+
+/* ADDED THIS because the lot is now drawn inside a custom canvas area
+   instead of a normal HTML card grid. */
+.lot-canvas {
+  position: relative;
+  margin-top: 1rem;
+  border: 2px solid #d1d5db;
+  border-radius: 18px;
+  background: #e5e7eb;
+  overflow: auto;
+}
+
+.lot-help {
+  margin: 0.85rem 0 0 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+/* ADDED THIS because decorations like title, aisle, entrance, and exit
+   are positioned on top of the parking canvas. */
+.lot-decoration {
+  position: absolute;
+}
+
+.lot-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+/* ADDED THIS for visual lane / aisle styling so the lot feels like
+   a simple parking map instead of just floating buttons. */
+.drive-lane,
+.center-aisle {
+  background: #94a3b8;
+  border-radius: 12px;
+  opacity: 0.35;
+}
+
+.entrance-text,
+.exit-text {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+/* CHANGED THIS because each parking space is now rendered as a positioned
+   button on the lot map instead of a card in a list. */
+.lot-spot {
+  position: absolute;
+  border: 2px solid #1f2937;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.1rem;
+  background: white;
+  color: #111827;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+  font-weight: 700;
+}
+
+.lot-spot:hover {
+  opacity: 0.92;
+}
+
+/* CHANGED THIS because open spots should use green. */
+.lot-spot.free {
+  background: #3a7d44;
+  color: white;
+  border-color: #2f6137;
+}
+
+/* ADDED THIS because clicking an open spot should highlight it
+   before the user confirms the reservation. */
+.lot-spot.selected {
+  background: #d4a017;
+  color: #111827;
+  border-color: #b8860b;
+}
+
+/* CHANGED THIS so both occupied and reserved spaces read as unavailable
+   and use the same red visual treatment. */
+.lot-spot.reserved,
+.lot-spot.occupied {
+  background: #b91c1c;
+  color: white;
+  border-color: #7f1d1d;
+  cursor: not-allowed;
+}
+
+/* KEPT THIS because accessible spaces can still be visually distinguished
+   later */
+.lot-spot.accessible {
+  border-style: dashed;
+}
+
+.spot-label {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.spot-id {
+  font-size: 0.72rem;
+  opacity: 0.92;
+}
+
+/* KEPT THIS so the layout still adapts on smaller screens. */
+@media (max-width: 900px) {
+  .topbar {
+    flex-direction: column;
+  }
+
+  .status-panel {
+    width: 100%;
+  }
+}
