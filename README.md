@@ -224,7 +224,7 @@ The intended project flow is:
 | Area | Tools |
 |---|---|
 | Frontend | HTML, CSS, JavaScript |
-| Backend | Python, Flask, Flask-CORS, Gunicorn |
+| Backend | Python, Flask, Flask-CORS, Render |
 | Computer Vision | OpenCV, NumPy, Requests |
 | Legacy Backend | Node.js, Express |
 | Deployment | GitHub Pages for the frontend, Render backend URL in the frontend code |
